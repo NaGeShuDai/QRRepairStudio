@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+build/
+dist/
+dist-v*/
+*.spec
+*.log
+selftest*.json
+ui-*.png
+release/
+.env
+.env.*
