@@ -67,10 +67,10 @@ def test_contour_precision_and_manual_heatmap_exclusion():
     assert len(np.unique(fine[:,:,:3].reshape(-1,3),axis=0)) > len(np.unique(coarse[:,:,:3].reshape(-1,3),axis=0))*2
     assert not np.array_equal(fine[:,:,0],fine[:,:,1])
     palette = contour_color(np.arange(256))
-    assert np.all(np.diff(palette.astype(int),axis=0) <= 0)
+    assert np.all(np.diff(palette.astype(int),axis=0) >= 0)
     assert np.all(palette[:,2] >= palette[:,1])
-    assert palette[0].tolist() == [255,255,255]
-    assert palette[-1].tolist() == [12,45,105]
+    assert palette[0].tolist() == [12,45,105]
+    assert palette[-1].tolist() == [255,255,255]
     g = generate(b"heat")
     g.probability[:] = .5
     g.source[10,10] = g.source[10,11] = 1

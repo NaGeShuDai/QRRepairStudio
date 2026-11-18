@@ -9,12 +9,12 @@ import traceback
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
-from PySide6.QtGui import QAction, QFont, QIcon, QKeySequence, QColor
+from PySide6.QtGui import QAction, QFont, QIcon, QKeySequence, QColor, QPixmap, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QListWidget,
     QPlainTextEdit, QSplitter, QFileDialog, QMessageBox, QToolBar, QButtonGroup,
     QDialog, QDialogButtonBox, QFormLayout, QTabWidget, QGroupBox, QProgressBar,
-    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget, QInputDialog, QStyle)
+    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget, QInputDialog, QStyle, QToolButton, QMenu)
 
 from . import __version__
 from .engine import (Grid, read_image, locate, scan, repair, render_matrix, generate,
@@ -270,9 +270,10 @@ class MainWindow(QMainWindow):
         self.grid_view.editStarted.connect(self.push_history)
         self.grid_view.editFinished.connect(self.edited)
         self.grid_view.hovered.connect(self.hover_cell)
+        self.grid_view.picked.connect(self.inspect_cell)
         self.grid_view.refresh()
         canvas_row = QHBoxLayout()
-        self.region_legend = QLabel("定位码\n时序区域\n格式信息\n版本信息\n校正码字\n数据码字")
+        self.region_legend = QLabel("<span style='color:#4876dc'>■</span> 定位图案<br><span style='color:#8a9bb4'>■</span> 分隔区域<br><span style='color:#1eaa91'>■</span> 时序图案<br><span style='color:#e8972c'>■</span> 格式信息<br><span style='color:#a55bcd'>■</span> 版本信息<br><span style='color:#e65782'>■</span> 校正图案<br><span style='color:#555555'>■</span> 数据与纠错码字")
         self.region_legend.setVisible(False)
         self.region_legend.setToolTip("区域提示颜色说明")
         canvas_row.addWidget(self.region_legend)
@@ -294,25 +295,55 @@ class MainWindow(QMainWindow):
         canvas_row.addWidget(self.heat_legend)
         mid.addLayout(canvas_row, 1)
         self.tool_bar = QToolBar("编辑工具")
-        self.tool_bar.setIconSize(QSize(20,20))
-        self.tool_bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        for text, mode, icon in [("画黑", "black", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)),
-                                 ("画白", "white", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton)),
-                                 ("未知", "unknown", self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)),
-                                 ("框选", "select", self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)),
-                                 ("点选", "inspect", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogHelpButton))]:
-            act = QAction(icon, text, self)
-            act.setToolTip(text)
-            act.triggered.connect(lambda checked=False, m=mode: self.set_tool_mode(m))
-            self.tool_bar.addAction(act)
-        mid.addWidget(self.tool_bar)
+        self.tool_bar.setMovable(False)
+        self.tool_buttons = {}
+        for title, glyph, modes in [("画笔", "✎", [("反转", "invert"), ("未知循环", "cycle")]),
+                                     ("框选", "▣", [("框选", "select")]),
+                                     ("点选", "⌖", [("块模式", "inspect_block"), ("格模式", "inspect_cell")])]:
+            tool = QToolButton()
+            icon_image = QPixmap(28, 28)
+            icon_image.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(icon_image)
+            painter.setPen(QColor("#111111"))
+            painter.setPen(QPen(QColor("#111111"), 2))
+            if title == "画笔":
+                painter.drawLine(6,22,21,7)
+                painter.drawLine(9,24,24,9)
+                painter.drawLine(6,22,9,24)
+                painter.drawLine(21,7,24,9)
+            elif title == "框选":
+                painter.setPen(QPen(QColor("#111111"), 2, Qt.PenStyle.DashLine))
+                painter.drawRect(5,5,18,18)
+            else:
+                painter.drawEllipse(7,7,14,14)
+                painter.drawLine(14,2,14,10)
+                painter.drawLine(14,18,14,26)
+                painter.drawLine(2,14,10,14)
+                painter.drawLine(18,14,26,14)
+            painter.end()
+            tool.setIcon(QIcon(icon_image))
+            tool.setIconSize(QSize(28,28))
+            tool.setToolTip(title)
+            tool.setCheckable(True)
+            tool.setAccessibleName(title)
+            menu = QMenu(tool)
+            for label, mode in modes:
+                action = menu.addAction(label)
+                action.triggered.connect(lambda checked=False, m=mode, t=tool, name=title: self.activate_tool(m,t,name))
+            tool.setMenu(menu)
+            tool.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+            tool.clicked.connect(lambda checked=False, t=tool, m=modes[0][1], name=title: self.activate_tool(getattr(t,"mode",m),t,name))
+            self.tool_bar.addWidget(tool)
+            self.tool_buttons[title] = tool
+        mid.insertWidget(1, self.tool_bar)
+        self.activate_tool("invert", self.tool_buttons["画笔"], "画笔")
         self.selection_actions = QWidget()
         row = QHBoxLayout(self.selection_actions)
         row.setContentsMargins(0,0,0,0)
-        for label, value in [("选区填黑", 1), ("填白", 0)]:
+        for label, value in [("设置为黑", 1), ("设置为白", 0), ("设置为未知", -1)]:
             row.addWidget(button(label, lambda checked=False, v=value: self.fill_selection(v)))
         self.selection_actions.hide()
-        mid.addWidget(self.selection_actions)
+        mid.insertWidget(2, self.selection_actions)
         row = QHBoxLayout()
         heat = QCheckBox("置信度热力图")
         self.heat_check = heat
@@ -329,10 +360,11 @@ class MainWindow(QMainWindow):
         regions.toggled.connect(self.toggle_regions)
         row.addWidget(regions)
         row.addWidget(button("适合窗口", self.grid_view.fit))
+        row.setSpacing(3)
         controls.addLayout(row)
         row = QHBoxLayout()
         self.contour_check = QCheckBox("彩色等高线")
-        self.contour_check.setToolTip("白→深蓝对应灰度 0→255。")
+        self.contour_check.setToolTip("原图越黑越蓝，越白越白。")
         self.contour_check.toggled.connect(self.update_contours)
         row.addWidget(self.contour_check)
         self.contour_interval = QSpinBox()
@@ -349,18 +381,25 @@ class MainWindow(QMainWindow):
         self.contour_alpha.setToolTip("等高线不透明度")
         self.contour_alpha.valueChanged.connect(self.update_contours)
         row.addWidget(self.contour_alpha)
+        row.setSpacing(3)
         controls.addLayout(row)
         row = QHBoxLayout()
         row.addWidget(button("补全固定结构", self.fix_structure))
         row.addWidget(button("下一可疑格", self.next_unknown))
         row.addWidget(button("解锁全部", self.unlock_all))
+        row.setSpacing(3)
         controls.addLayout(row)
         row = QHBoxLayout()
         row.addWidget(button("旋转 90°", lambda: self.transform_grid("rotate")))
         row.addWidget(button("镜像", lambda: self.transform_grid("mirror")))
         row.addWidget(button("黑白反转", lambda: self.transform_grid("invert")))
+        row.setSpacing(3)
         controls.addLayout(row)
         controls.addStretch()
+        self.options_panel.setStyleSheet("QPushButton,QToolButton { padding: 5px 4px; } QSpinBox,QComboBox { padding: 3px; min-width: 0px; }")
+        options_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+
         self.cell_info = QLabel("")
         self.cell_info.setObjectName("muted")
         self.cell_info.setWordWrap(True)
@@ -376,6 +415,10 @@ class MainWindow(QMainWindow):
             detail_row.addLayout(column)
         detail_row.addWidget(self.cell_info, 1)
         mid.addLayout(detail_row)
+        self.inspection = QLabel()
+        self.inspection.setWordWrap(True)
+        self.inspection.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        mid.addWidget(self.inspection)
         self.middle.setMinimumWidth(350)
         self.splitter.addWidget(self.middle)
 
@@ -1059,7 +1102,7 @@ class MainWindow(QMainWindow):
         self.grid_view.dragging = False
         self.grid_view.rect_start = None
         self.preview_button.setText("返回编辑" if value else "预览视图")
-        self.brush_actions.setVisible(not value)
+        self.tool_bar.setVisible(not value)
         self.selection_actions.setVisible(not value and self.grid_view.tool == "select")
         self.heat_legend.setVisible(not value and self.heat_check.isChecked())
         self.grid_view.refresh()
@@ -1069,8 +1112,27 @@ class MainWindow(QMainWindow):
         self.binary_mode = not self.binary_mode
         self.binary_button.setText("关闭二值化" if self.binary_mode else "二值化处理")
         if self.image is not None:
-            self.update_crop()
+            self.sync_source_preview()
             self.start_scan()
+
+    def activate_tool(self, mode, tool, title):
+        tool.mode = mode
+        tool.setToolTip(title + " · " + {"invert":"反转", "cycle":"未知 → 黑 → 白", "select":"框选", "inspect_block":"块模式", "inspect_cell":"格模式"}[mode])
+        for item in self.tool_buttons.values():
+            item.setChecked(item is tool)
+        self.grid_view.tool = mode
+        self.grid_view.inspected_mask = None
+        if hasattr(self,"selection_actions"):
+            self.selection_actions.setVisible(mode == "select")
+        self.grid_view.viewport().update()
+
+    def inspect_cell(self, r, c):
+        from .inspection import inspect_module
+        matrix = self.grid_view.preview if self.grid_view.preview is not None else self.grid.values
+        mask, text = inspect_module(matrix, r, c, self.grid_view.tool == "inspect_block")
+        self.grid_view.inspected_mask = mask
+        self.inspection.setText(text)
+        self.grid_view.viewport().update()
 
     def set_tool_mode(self, mode):
         if mode == "inspect":
@@ -1105,7 +1167,7 @@ class MainWindow(QMainWindow):
         return True
 
     def fill_selection(self, value):
-        if value not in (0,1):
+        if value not in (-1,0,1):
             return
         if not self.ensure_editable():
             return

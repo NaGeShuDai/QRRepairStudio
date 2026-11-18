@@ -292,13 +292,16 @@ class GridView(ZoomView):
     editStarted = Signal()
     editFinished = Signal()
     hovered = Signal(int, int)
+    picked = Signal(int, int)
     CELL = 12
 
     def __init__(self):
         super().__init__()
         self.grid = None
         self.preview = None
-        self.tool = "black"
+        self.tool = "invert"
+        self.inspected_mask = None
+        self.cycle_next = {}
         self.heatmap = False
         self.show_lines = True
         self.dragging = False
@@ -317,6 +320,8 @@ class GridView(ZoomView):
 
     def set_grid(self, grid, fit=False):
         self.grid = grid
+        self.inspected_mask = None
+        self.cycle_next.clear()
         self.preview = None
         self.refresh()
         if fit:
@@ -376,7 +381,7 @@ class GridView(ZoomView):
         if self.show_regions:
             colors = {"定位": QColor(72, 118, 220, 75), "时序": QColor(30, 170, 145, 85),
                       "格式": QColor(232, 151, 44, 90), "版本": QColor(165, 91, 205, 90),
-                      "校正": QColor(230, 87, 130, 75), "数据": QColor(80, 80, 80, 25)}
+                      "校正": QColor(230, 87, 130, 75), "数据": QColor(80, 80, 80, 25), "分隔": QColor(138,155,180,85)}
             masks = region_masks(self.grid.version)
             for name, mask in masks.items():
                 painter.setBrush(colors[name])
@@ -391,6 +396,11 @@ class GridView(ZoomView):
         painter.setPen(QPen(QColor("#feaf47"), 0))
         for r, c in np.argwhere(self.grid.locked):
             painter.drawRect(QRectF(c*cell+2, r*cell+2, cell-4, cell-4))
+        if self.inspected_mask is not None:
+            painter.setBrush(QColor(240, 180, 25, 95))
+            painter.setPen(QPen(QColor("#aa7800"), 0))
+            for r,c in np.argwhere(self.inspected_mask):
+                painter.drawRect(QRectF(c*cell,r*cell,cell,cell))
         if self.selection:
             r0, c0, r1, c1 = self.selection
             painter.setBrush(QColor(45, 224, 186, 60))
@@ -415,9 +425,18 @@ class GridView(ZoomView):
             if self.grid.values[r, c] >= 0:
                 self.grid.locked[r, c] = not self.grid.locked[r, c]
         elif not self.grid.locked[r, c]:
-            if self.tool not in ("black", "white", "unknown"):
+            if self.tool not in ("black", "white", "unknown", "invert", "cycle"):
                 return
-            self.grid.values[r, c] = -1 if self.tool == "unknown" else (0 if right else {"black": 1, "white": 0}[self.tool])
+            if self.tool == "invert":
+                if self.grid.values[r,c] < 0:
+                    return
+                self.grid.values[r,c] = 1-self.grid.values[r,c]
+            elif self.tool == "cycle":
+                value = self.cycle_next.get(cell, -1)
+                self.grid.values[r,c] = value
+                self.cycle_next[cell] = {-1:1,1:0,0:-1}[value]
+            else:
+                self.grid.values[r, c] = -1 if self.tool == "unknown" else (0 if right else {"black": 1, "white": 0}[self.tool])
             self.grid.source[r, c] = 1
         self.refresh()
 
@@ -425,6 +444,10 @@ class GridView(ZoomView):
         if self.preview_mode or event.button() == Qt.MouseButton.MiddleButton:
             return super().mousePressEvent(event)
         cell = self.cell_at(event.position())
+        if cell is not None and self.tool.startswith("inspect_"):
+            self.picked.emit(*cell)
+            event.accept()
+            return
         if cell is not None and self.preview is None:
             if self.tool == "select":
                 self.rect_start = cell

@@ -94,7 +94,7 @@ def run(output):
             window.grid.source[12,12] = 0
             window.grid.probability[12,12] = .5
             assert np.array_equal(grid_colors(window.grid,True)[12,12],confidence_legend()[0,0,:3])
-            assert np.all(contour_color(255) < contour_color(0))
+            assert np.all(contour_color(255) > contour_color(0))
             assert window.selection_actions.isHidden()
             window.set_tool("select")
             assert not window.selection_actions.isHidden()

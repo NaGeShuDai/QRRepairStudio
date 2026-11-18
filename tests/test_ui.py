@@ -263,7 +263,7 @@ def test_preview_shows_exact_matrix_with_quiet_zone_and_blocks_paint():
     w.contour_check.setChecked(True)
     w.preview_button.setChecked(True)
     assert w.grid_view.preview_mode
-    assert w.heat_legend.isHidden() and w.brush_actions.isHidden()
+    assert w.heat_legend.isHidden() and w.tool_bar.isHidden()
     assert len(w.grid_view.scene().items()) == 1
     def pixels():
         image = w.grid_view.base_item.pixmap().toImage()
@@ -281,7 +281,7 @@ def test_preview_shows_exact_matrix_with_quiet_zone_and_blocks_paint():
     assert np.array_equal(pixels(),render_matrix(candidate,12,4))
     w.preview_button.setChecked(False)
     assert not w.grid_view.preview_mode
-    assert not w.heat_legend.isHidden() and not w.brush_actions.isHidden()
+    assert not w.heat_legend.isHidden() and not w.tool_bar.isHidden()
     assert np.array_equal(w.grid.values,original)
     w.dirty = False
     w.close()

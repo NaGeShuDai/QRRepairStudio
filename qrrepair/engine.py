@@ -215,6 +215,10 @@ def region_masks(version):
     t = template(version)
     finder = np.zeros((n, n), bool)
     finder[:8, :8] = finder[:8, -8:] = finder[-8:, :8] = True
+    separator = finder.copy()
+    finder[:] = False
+    finder[:7,:7] = finder[:7,-7:] = finder[-7:,:7] = True
+    separator &= ~finder
     timing = np.zeros((n, n), bool)
     timing[6, 8:n-8] = True
     timing[8:n-8, 6] = True
@@ -223,7 +227,7 @@ def region_masks(version):
     format_mask[:9, 8] = True
     format_mask[8, n-8:n] = True
     format_mask[n-7:n, 8] = True
-    alignment = (t >= 0) & ~finder & ~timing & ~format_mask
+    alignment = (t >= 0) & ~finder & ~separator & ~timing & ~format_mask
     # Version information is present only for versions 7–40 and is identifiable
     # as the two 3×6 fixed blocks near the upper-right/lower-left finders.
     version_info = np.zeros((n, n), bool)
@@ -231,8 +235,8 @@ def region_masks(version):
         version_info[:6, n-11:n-8] = True
         version_info[n-11:n-8, :6] = True
     alignment &= ~version_info
-    data = ~(finder | timing | format_mask | version_info | alignment)
-    result = {"定位": finder, "时序": timing, "格式": format_mask,
+    data = ~(finder | separator | timing | format_mask | version_info | alignment)
+    result = {"分隔": separator, "定位": finder, "时序": timing, "格式": format_mask,
               "版本": version_info, "校正": alignment, "数据": data}
     for value in result.values():
         value.flags.writeable = False
