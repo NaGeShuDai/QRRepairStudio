@@ -1,0 +1,777 @@
+{
+  "metadata": {
+    "baseline_commit": "09398f3c14f05a31898e73152bd9546605fa2925",
+    "seed": 20261119,
+    "count": 32,
+    "versions": [
+      1,
+      3,
+      7,
+      12
+    ],
+    "dataset": "deterministic synthetic perspective, blur, shadow, noise; data damage in every third case",
+    "measurement": "full-image locate plus scan; same inputs; warm template caches"
+  },
+  "summary": {
+    "before": {
+      "detected": 32,
+      "cases": 32,
+      "correct_version": 32,
+      "decoded_intact": 22,
+      "intact_cases": 22,
+      "mean_grid_error_modules": 0.08517578634200618,
+      "mean_bit_error": 0.004807692307692307,
+      "median_total_ms": 3563.744200007932,
+      "p95_total_ms": 5641.060814997036
+    },
+    "after": {
+      "detected": 32,
+      "cases": 32,
+      "correct_version": 32,
+      "decoded_intact": 22,
+      "intact_cases": 22,
+      "mean_grid_error_modules": 0.05533313032356091,
+      "mean_bit_error": 0.000506531014772773,
+      "median_total_ms": 497.92724999861093,
+      "p95_total_ms": 1382.554920000257
+    }
+  },
+  "cases": [
+    {
+      "case": 0,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 3.036399997654371,
+        "version": 1,
+        "grid_error": 0.08433007448911667,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 2237.3382999940077
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 250.60850000591017,
+        "version": 1,
+        "grid_error": 0.08289419114589691,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 519.7937000048114
+      }
+    },
+    {
+      "case": 1,
+      "version": 3,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.616999999503605,
+        "version": 3,
+        "grid_error": 0.05820302665233612,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 4286.275399994338
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 891.3218000088818,
+        "version": 3,
+        "grid_error": 0.05820302665233612,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 1314.7049999970477
+      }
+    },
+    {
+      "case": 2,
+      "version": 7,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 110.89590001211036,
+        "version": 7,
+        "grid_error": 0.07127068936824799,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 6449.309300005552
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 1403.7022999982582,
+        "version": 7,
+        "grid_error": 0.019576750695705414,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 1849.361400003545
+      }
+    },
+    {
+      "case": 3,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 11.218300001928583,
+        "version": 12,
+        "grid_error": 0.1147509217262268,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3750.0686999992467
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 275.8054999867454,
+        "version": 12,
+        "grid_error": 0.01944345235824585,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 738.6580999882426
+      }
+    },
+    {
+      "case": 4,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 10.188700005528517,
+        "version": 1,
+        "grid_error": 0.049197252839803696,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3784.3876000115415
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 247.33279999054503,
+        "version": 1,
+        "grid_error": 0.049197252839803696,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 464.4289999996545
+      }
+    },
+    {
+      "case": 5,
+      "version": 3,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 74.48510000540409,
+        "version": 3,
+        "grid_error": 0.07142096012830734,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 4548.26779999712
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 1079.463800007943,
+        "version": 3,
+        "grid_error": 0.01994847133755684,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 1465.4826000041794
+      }
+    },
+    {
+      "case": 6,
+      "version": 7,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 14.435000004596077,
+        "version": 7,
+        "grid_error": 0.0279254037886858,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 5498.09280000045
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 254.79649999761023,
+        "version": 7,
+        "grid_error": 0.016709040850400925,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 472.7521000022534
+      }
+    },
+    {
+      "case": 7,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.840599995688535,
+        "version": 12,
+        "grid_error": 0.03905922546982765,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3554.164800007129
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 219.12690000317525,
+        "version": 12,
+        "grid_error": 0.014455027878284454,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 594.8042000090936
+      }
+    },
+    {
+      "case": 8,
+      "version": 1,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 67.78219999978319,
+        "version": 1,
+        "grid_error": 0.06640089303255081,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3463.321500006714
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 275.38069999718573,
+        "version": 1,
+        "grid_error": 0.12887364625930786,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 496.93419999675825
+      }
+    },
+    {
+      "case": 9,
+      "version": 3,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.123500010697171,
+        "version": 3,
+        "grid_error": 0.047981008887290955,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3382.4717000097735
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 205.35329999984242,
+        "version": 3,
+        "grid_error": 0.047981008887290955,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 441.09510000271257
+      }
+    },
+    {
+      "case": 10,
+      "version": 7,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.220199990319088,
+        "version": 7,
+        "grid_error": 0.04497529938817024,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3457.2839999891585
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 225.72639999270905,
+        "version": 7,
+        "grid_error": 0.12264908105134964,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 398.3276999933878
+      }
+    },
+    {
+      "case": 11,
+      "version": 12,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 47.315600008005276,
+        "version": 12,
+        "grid_error": 0.5292853713035583,
+        "bit_error": 0.1493491124260355,
+        "decoded": false,
+        "total_ms": 4958.760900000925
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 482.82439999456983,
+        "version": 12,
+        "grid_error": 0.014932564459741116,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 857.7111999911722
+      }
+    },
+    {
+      "case": 12,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.782399992924184,
+        "version": 1,
+        "grid_error": 0.12251044064760208,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3463.9491999987513
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 198.5809000034351,
+        "version": 1,
+        "grid_error": 0.10871339589357376,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 373.98920000123326
+      }
+    },
+    {
+      "case": 13,
+      "version": 3,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.179599997471087,
+        "version": 3,
+        "grid_error": 0.05969410017132759,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3437.9981999954907
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 198.34919999993872,
+        "version": 3,
+        "grid_error": 0.007553482428193092,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 407.55889999854844
+      }
+    },
+    {
+      "case": 14,
+      "version": 7,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 57.24059999920428,
+        "version": 7,
+        "grid_error": 0.07715290039777756,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3407.505199997104
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 194.55369999923278,
+        "version": 7,
+        "grid_error": 0.13361866772174835,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 361.3307000050554
+      }
+    },
+    {
+      "case": 15,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.351099993684329,
+        "version": 12,
+        "grid_error": 0.10011354833841324,
+        "bit_error": 0.00378698224852071,
+        "decoded": true,
+        "total_ms": 3910.010000006878
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 432.27740000293124,
+        "version": 12,
+        "grid_error": 0.02793252468109131,
+        "bit_error": 0.002366863905325444,
+        "decoded": true,
+        "total_ms": 1015.3484000038588
+      }
+    },
+    {
+      "case": 16,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 12.772399990353733,
+        "version": 1,
+        "grid_error": 0.06260652095079422,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 5815.799499992863
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 340.71219999168534,
+        "version": 1,
+        "grid_error": 0.06260652095079422,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 674.5027999859303
+      }
+    },
+    {
+      "case": 17,
+      "version": 3,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 72.31889999820851,
+        "version": 3,
+        "grid_error": 0.10519718378782272,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3673.36780000187
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 201.60909999685828,
+        "version": 3,
+        "grid_error": 0.028313755989074707,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 406.8595999997342
+      }
+    },
+    {
+      "case": 18,
+      "version": 7,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 6.016600003931671,
+        "version": 7,
+        "grid_error": 0.03507624939084053,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3475.483800008078
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 204.71980000729673,
+        "version": 7,
+        "grid_error": 0.03507624939084053,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 408.75460000825115
+      }
+    },
+    {
+      "case": 19,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.866299991495907,
+        "version": 12,
+        "grid_error": 0.06723532825708389,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3422.8678999934345
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 200.54520000121556,
+        "version": 12,
+        "grid_error": 0.020309725776314735,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 622.6483999926131
+      }
+    },
+    {
+      "case": 20,
+      "version": 1,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 99.13410000444856,
+        "version": 1,
+        "grid_error": 0.09508305788040161,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3573.3236000087345
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 297.57640000025276,
+        "version": 1,
+        "grid_error": 0.18927009403705597,
+        "bit_error": 0.013605442176870748,
+        "decoded": false,
+        "total_ms": 498.9203000004636
+      }
+    },
+    {
+      "case": 21,
+      "version": 3,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.000899993930943,
+        "version": 3,
+        "grid_error": 0.06450073421001434,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 4091.449300001841
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 304.9101999931736,
+        "version": 3,
+        "grid_error": 0.08239661157131195,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 559.5675999938976
+      }
+    },
+    {
+      "case": 22,
+      "version": 7,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.997799999429844,
+        "version": 7,
+        "grid_error": 0.04716494306921959,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3516.9418000004953
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 199.09010000992566,
+        "version": 7,
+        "grid_error": 0.04716494306921959,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 416.10630000650417
+      }
+    },
+    {
+      "case": 23,
+      "version": 12,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 48.7208999984432,
+        "version": 12,
+        "grid_error": 0.08376063406467438,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3447.8243999910774
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 669.7762999974657,
+        "version": 12,
+        "grid_error": 0.016300350427627563,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 1047.0094000047538
+      }
+    },
+    {
+      "case": 24,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.938600003602915,
+        "version": 1,
+        "grid_error": 0.045399729162454605,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3461.170000009588
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 219.46009999373928,
+        "version": 1,
+        "grid_error": 0.045399729162454605,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 401.5631000074791
+      }
+    },
+    {
+      "case": 25,
+      "version": 3,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.423200008110143,
+        "version": 3,
+        "grid_error": 0.025606796145439148,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3643.594499997562
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 329.974400010542,
+        "version": 3,
+        "grid_error": 0.025606796145439148,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 705.1003000087803
+      }
+    },
+    {
+      "case": 26,
+      "version": 7,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 84.64490000915248,
+        "version": 7,
+        "grid_error": 0.12221909314393997,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3920.1580000080867
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 492.75000000488944,
+        "version": 7,
+        "grid_error": 0.009699217043817043,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 687.479300002451
+      }
+    },
+    {
+      "case": 27,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.847000000765547,
+        "version": 12,
+        "grid_error": 0.07235179841518402,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3466.3119000033475
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 204.83539999986533,
+        "version": 12,
+        "grid_error": 0.016831396147608757,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 480.23980000289157
+      }
+    },
+    {
+      "case": 28,
+      "version": 1,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 7.631600004970096,
+        "version": 1,
+        "grid_error": 0.06949702650308609,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 3415.5744000017876
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 196.80559998960234,
+        "version": 1,
+        "grid_error": 0.1350553184747696,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 386.41769999230746
+      }
+    },
+    {
+      "case": 29,
+      "version": 3,
+      "damaged": true,
+      "before": {
+        "detected": true,
+        "detect_ms": 55.78689998947084,
+        "version": 3,
+        "grid_error": 0.10165300220251083,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 3502.4909999920055
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 211.16489999985788,
+        "version": 3,
+        "grid_error": 0.1467241495847702,
+        "bit_error": 0.0,
+        "decoded": false,
+        "total_ms": 427.3834000050556
+      }
+    },
+    {
+      "case": 30,
+      "version": 7,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 8.25099999201484,
+        "version": 7,
+        "grid_error": 0.05156462639570236,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 5203.685899992706
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 452.54049998766277,
+        "version": 7,
+        "grid_error": 0.010145519860088825,
+        "bit_error": 0.0,
+        "decoded": true,
+        "total_ms": 843.2559999928344
+      }
+    },
+    {
+      "case": 31,
+      "version": 12,
+      "damaged": false,
+      "before": {
+        "detected": true,
+        "detect_ms": 12.413799995556474,
+        "version": 12,
+        "grid_error": 0.11243732273578644,
+        "bit_error": 0.0007100591715976331,
+        "decoded": true,
+        "total_ms": 3716.012099990621
+      },
+      "after": {
+        "detected": true,
+        "detect_ms": 206.05239999713376,
+        "version": 12,
+        "grid_error": 0.027078207582235336,
+        "bit_error": 0.00023668639053254438,
+        "decoded": true,
+        "total_ms": 493.6006000061752
+      }
+    }
+  ]
+}

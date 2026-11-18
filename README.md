@@ -2,6 +2,10 @@
 
 本地二维码修复桌面工具。支持模糊、透视、旋转图像的网格采样、手动编辑与纠错。
 
+1.6 边界升级：ZXing 校验失败候选与 Aruco 多码检测、结构掩码透视精修、版本筛选、原图直接采样与覆盖/位置稳定性降权。调整选区中可选择二维码、固定角点或点击三个定位图形中心。纠错失败时在剩余时间内尝试有原图结构证据支持的边界反馈。
+
+实现与验收记录见 `docs/boundary-upgrade.md`；可复现基准在 `tools/benchmark_boundary.py`，逐例数据在 `docs/boundary-benchmark.json`。
+
 ![工作区](docs/workspace.png)
 
 ## 使用

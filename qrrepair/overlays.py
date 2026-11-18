@@ -12,6 +12,7 @@ def confidence_colors(strength):
 
 
 def contour_color(level):
+    """Map grayscale 0→255 to white→deep navy."""
     t = np.clip(np.asarray(level), 0, 255)[..., None]/255
     return np.rint(np.array([255,255,255])*(1-t) + np.array([12,45,105])*t).astype(np.uint8)
 
@@ -32,8 +33,8 @@ def grid_colors(grid, heatmap=False, preview=None):
     a = grid.values if preview is None else preview
     p = np.asarray(grid.probability, np.float32)
     chosen = np.where(a < 0, p >= .5, a == 1).astype(np.float32)
-    light = np.array([238, 248, 246], np.float32)
-    deep = np.array([20, 67, 96], np.float32)
+    light = np.array([255, 255, 255], np.float32)
+    deep = np.array([0, 0, 0], np.float32)
     rgb = (light[None,None,:] * (1-chosen[...,None]) + deep[None,None,:] * chosen[...,None]).astype(np.uint8)
     if heatmap:
         strength = np.abs(grid.probability-.5)*2

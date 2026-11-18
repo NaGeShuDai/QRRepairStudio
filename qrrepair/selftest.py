@@ -129,6 +129,11 @@ def run(output):
             window.preview_button.setChecked(False)
             assert window.grid_view.base_item.opacity() == .3
             report["checks"].append("Black-white QR preview with quiet zone and return to contour editing")
+            window.adjust_selection()
+            assert window.source_view.horizontalScrollBarPolicy().name == "ScrollBarAsNeeded"
+            assert window.source_view.verticalScrollBarPolicy().name == "ScrollBarAsNeeded"
+            window.selection_dialog.accept()
+            report["checks"].append("Selection editor scroll navigation")
         window.dirty = False
         window.close()
         app.processEvents()

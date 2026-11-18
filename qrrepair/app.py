@@ -14,12 +14,13 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QLabel, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QListWidget,
     QPlainTextEdit, QSplitter, QFileDialog, QMessageBox, QToolBar, QButtonGroup,
     QDialog, QDialogButtonBox, QFormLayout, QTabWidget, QGroupBox, QProgressBar,
-    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget)
+    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget, QInputDialog)
 
 from . import __version__
 from .engine import (Grid, read_image, locate, scan, repair, render_matrix, generate,
                      restore_structure, oriented_corners, decode_image, fixed_mask,
                      finder_mask, optimize_quad, warp, resolve_unknowns)
+from .engine import locate_candidates, repair_with_geometry
 from .validation import validate_matrix, require_valid
 from .overlays import grayscale_contours, confidence_legend
 from .project import save_project, load_project, export_svg
@@ -78,6 +79,8 @@ class MainWindow(QMainWindow):
         self.contour_layer = None
         self.background_color = None
         self.scan_geometry_mirrored = False
+        self.boundary_candidates = []
+        self.geometry_status = ""
         self.check_timer = QTimer(self)
         self.check_timer.setSingleShot(True)
         self.check_timer.setInterval(650)
@@ -177,6 +180,7 @@ class MainWindow(QMainWindow):
         self.source_view = SourceView()
         self.source_view.cornersChanged.connect(self.corners_changed)
         self.source_view.colorPicked.connect(self.set_background_color)
+        self.source_view.findersPicked.connect(self.finders_picked)
         self.source_view.set_image(None)
         self.selection_dialog = QDialog(self)
         self.selection_dialog.setWindowTitle("调整选区")
@@ -187,10 +191,26 @@ class MainWindow(QMainWindow):
         row.addWidget(button("优化框选", lambda: self.auto_locate(True)))
         row.addWidget(button("全图定位", self.auto_locate))
         row.addWidget(button("重置四角", self.reset_corners))
+        row.addWidget(button("三点定位", self.pick_finders))
         row.addWidget(button("聚焦", self.source_view.focus_selection))
         row.addWidget(button("全图", self.source_view.fit))
         row.addWidget(button("完成", self.selection_dialog.accept, True))
         selection_layout.addLayout(row)
+        locks = QHBoxLayout()
+        locks.addWidget(QLabel("固定角点"))
+        self.corner_locks = []
+        for name in ("左上", "右上", "右下", "左下"):
+            check = QCheckBox(name)
+            self.corner_locks.append(check)
+            locks.addWidget(check)
+        selection_layout.addLayout(locks)
+        self.region_list = QComboBox()
+        self.region_list.setToolTip("多码图片可在这里选择目标二维码。")
+        self.region_list.currentIndexChanged.connect(self.choose_boundary)
+        selection_layout.addWidget(self.region_list)
+        self.geometry_label = QLabel("")
+        self.geometry_label.setWordWrap(True)
+        selection_layout.addWidget(self.geometry_label)
         self.crop_view = CropView()
         left.addWidget(self.crop_view, 2)
         self.corner_info = QLabel("")
@@ -447,6 +467,7 @@ class MainWindow(QMainWindow):
         if self.image is None:
             return
         self.selection_dialog.show()
+        self.source_view.enable_navigation(True)
         self.source_view.focus_selection()
         self.selection_dialog.raise_()
 
@@ -570,6 +591,14 @@ class MainWindow(QMainWindow):
         self.apply_button.setEnabled(False)
 
     def reset_document(self):
+        self.boundary_candidates = []
+        self.region_list.blockSignals(True)
+        self.region_list.clear()
+        self.region_list.blockSignals(False)
+        self.geometry_label.clear()
+        self.source_view.finder_clicks = None
+        for check in self.corner_locks:
+            check.setChecked(False)
         self.selection_dialog.hide()
         self.preview_button.setChecked(False)
         self.check_timer.stop()
@@ -636,6 +665,13 @@ class MainWindow(QMainWindow):
         if self.image is None:
             return
         self.scan_geometry_mirrored = False
+        self.boundary_candidates = []
+        self.region_list.blockSignals(True)
+        self.region_list.clear()
+        self.region_list.blockSignals(False)
+        self.geometry_label.clear()
+        for check in self.corner_locks:
+            check.setChecked(False)
         h, w = self.image.shape[:2]
         p = np.array([[w*.1, h*.1], [w*.9, h*.1], [w*.9, h*.9], [w*.1, h*.9]], np.float32)
         self.source_view.set_image(self.image, p)
@@ -655,9 +691,20 @@ class MainWindow(QMainWindow):
         mirrored = self.mirror_input.isChecked()
         corners_in = self.source_view.corners.copy() if within_selection and self.source_view.corners is not None else None
         geometry_mirrored = self.scan_geometry_mirrored if corners_in is not None else False
+        locked = np.array([check.isChecked() for check in self.corner_locks])
 
         def done(result):
-            corners, contents = result
+            regions = result
+            self.boundary_candidates = regions
+            self.region_list.blockSignals(True)
+            self.region_list.clear()
+            for i, (corners, contents, sample, backend) in enumerate(regions):
+                self.region_list.addItem(f"目标 {i+1} · {backend}" + (f" · {contents[0][0][:32]}" if contents else ""))
+            self.region_list.blockSignals(False)
+            if regions:
+                corners, contents, sample, backend = regions[0]
+            else:
+                corners, contents, sample = None, [], None
             if corners is None:
                 self.result_title.setText("保留当前选区" if within_selection else "请调整四角")
                 self.statusBar().showMessage("定位未完成")
@@ -671,21 +718,107 @@ class MainWindow(QMainWindow):
                 self.invalidate_geometry()
                 self.result_title.setText("已定位")
                 self.statusBar().showMessage("定位完成")
+                if sample is not None and sample.geometry is not None:
+                    self.show_geometry(sample)
+                    self.orient_corner_locks(sample)
+                if len(regions) > 1:
+                    self.adjust_selection()
+                    self.result_title.setText(f"找到 {len(regions)} 个目标，请选择二维码")
             if contents:
                 self.content.setPlainText("\n\n".join(t for t, _ in contents))
                 self.payload = contents[0][1]
                 self.result_title.setText(f"识别完成")
         def detect_and_orient(cancel, progress):
-            corners, contents = (optimize_quad(image, corners_in,background,colorful,inverted)
-                if corners_in is not None else locate(image,background,colorful,inverted))
-            if corners is not None and not cancel():
+            if corners_in is not None:
+                corners, contents = optimize_quad(image, corners_in,background,colorful,inverted,cancel)
+                # A manually supplied boundary can be refined even when no decoder
+                # can detect the damaged symbol. Structural quality gates acceptance.
+                proposals = [(corners if corners is not None else corners_in, contents, "选区精修")]
+            else:
+                proposals = [(d.corners, [(d.text,d.payload)] if d.decoded else [], d.backend)
+                             for d in locate_candidates(image,background,colorful,inverted,cancel)]
+            regions = []
+            for corners, contents, backend in proposals:
+                if cancel():
+                    break
+                corners = corners.copy()
+                if corners_in is not None:
+                    corners[locked] = corners_in[locked]
                 progress("摆正选区")
                 candidates = scan(image, corners, cancel=cancel, mirror=mirrored != geometry_mirrored,
-                                  invert=inverted)
-                if candidates:
-                    corners = oriented_corners(corners, candidates[0])
-            return corners, contents
+                                   invert=inverted, locked_corners=locked if corners_in is not None else None)
+                if candidates and candidates[0].score >= .68:
+                    sample = candidates[0]
+                    corners = oriented_corners(corners, sample)
+                    regions.append((corners, contents, sample, backend))
+            return regions
         self.run_job(detect_and_orient, done)
+
+    def show_geometry(self, sample):
+        quality = sample.geometry
+        if quality is None:
+            return
+        self.geometry_status = (f"V{sample.grid.version} · {quality.message} · "
+                                f"有效覆盖 {quality.coverage:.0%} · 结构吻合 {sample.score:.3f}")
+        if quality.ambiguous:
+            self.geometry_status += " · 版本候选接近，请检查网格"
+        self.geometry_label.setText(self.geometry_status)
+        self.corner_info.setToolTip(self.geometry_status)
+
+    def orient_corner_locks(self, sample):
+        locks = np.array([check.isChecked() for check in self.corner_locks])
+        if sample.mirrored:
+            locks = locks[[1,0,3,2]]
+        locks = np.roll(locks, -sample.rotation)
+        for check, value in zip(self.corner_locks, locks):
+            check.setChecked(bool(value))
+
+    def pick_finders(self):
+        version = self.version.currentData()
+        if not version:
+            version, ok = QInputDialog.getInt(self, "三点定位", "二维码版本（用于确定定位图形与边界的距离）", 3, 1, 40)
+            if not ok:
+                return
+        self.finder_version = version
+        self.source_view.finder_clicks = []
+        self.source_view.setCursor(Qt.CursorShape.CrossCursor)
+        self.geometry_label.setText("依次点击左上、右上、左下定位图形的中心；完成后自动精修。")
+
+    def finders_picked(self, centers):
+        import cv2
+        n = 17+4*self.finder_version
+        ideal = np.float32([[3.5,3.5],[n-3.5,3.5],[3.5,n-3.5]])
+        transform = cv2.getAffineTransform(ideal, centers)
+        corners = cv2.transform(np.float32([[[0,0],[n,0],[n,n],[0,n]]]), transform)[0]
+        from .engine import validate_quad
+        try:
+            validate_quad(corners)
+        except ValueError:
+            self.geometry_label.setText("三个中心点过于接近，请重新选择。")
+            return
+        self.version.setCurrentIndex(self.finder_version)
+        self.source_view.set_image(self.image, corners)
+        self.source_view.dimension = 0
+        self.invalidate_geometry()
+        self.mark_dirty()
+        self.start_scan()
+
+    def choose_boundary(self, index):
+        if not 0 <= index < len(self.boundary_candidates):
+            return
+        corners, contents, sample, backend = self.boundary_candidates[index]
+        self.source_view.set_image(self.image, corners)
+        self.source_view.dimension = 0
+        self.scan_geometry_mirrored = self.mirror_input.isChecked()
+        self.invalidate_geometry()
+        self.mark_dirty()
+        self.source_view.focus_selection()
+        self.show_geometry(sample)
+        for check in self.corner_locks:
+            check.setChecked(False)
+        if contents:
+            self.content.setPlainText(contents[0][0])
+            self.payload = contents[0][1]
 
     def invalidate_geometry(self):
         self.check_timer.stop()
@@ -748,6 +881,7 @@ class MainWindow(QMainWindow):
         # Mirrored geometry is already rectified after choosing a mirrored sample.
         mirror = self.mirror_input.isChecked() != self.scan_geometry_mirrored
         invert = self.invert_input.isChecked()
+        locks = np.array([check.isChecked() for check in self.corner_locks])
         self.scan_corners = corners
 
         def done(samples):
@@ -766,7 +900,7 @@ class MainWindow(QMainWindow):
             self.sample_list.setCurrentRow(0)
             self.statusBar().showMessage("采样完成")
         self.run_job(lambda cancel, progress: scan(image, corners, [version] if version else None,
-                     bias, 0, cancel, progress, mirror=mirror, invert=invert), done)
+                     bias, 0, cancel, progress, mirror=mirror, invert=invert, locked_corners=locks), done)
 
     def choose_sample(self, index):
         if index < 0 or index >= len(self.samples):
@@ -784,6 +918,8 @@ class MainWindow(QMainWindow):
         self.grid_view.set_grid(self.grid, True)
         self.source_view.dimension = len(self.grid.values)
         self.update_contours()
+        self.show_geometry(sample)
+        self.orient_corner_locks(sample)
         self.source_view.viewport().update()
         self.edited()
 
@@ -976,7 +1112,10 @@ class MainWindow(QMainWindow):
                     # Sample the same filled bands shown in the editor, preserving
                     # quantized colors and alignment at the edge of the selection.
                     size = self.contour_layer.shape[0]
-                    local_transform = cv2.getPerspectiveTransform(local[0]*size/n,
+                    contour_local = np.array([[[c-2, r-2], [c+3, r-2], [c+3, r+3], [c-2, r+3]]], np.float32)
+                    contour_local[..., 0] = np.clip(contour_local[..., 0], 0, n)
+                    contour_local[..., 1] = np.clip(contour_local[..., 1], 0, n)
+                    local_transform = cv2.getPerspectiveTransform(contour_local[0]*size/n,
                         np.float32([[0,0],[108,0],[108,108],[0,108]]))
                     contour = cv2.warpPerspective(self.contour_layer, local_transform, (108,108),
                         flags=cv2.INTER_NEAREST, borderValue=(12,45,105,255))
@@ -1010,6 +1149,12 @@ class MainWindow(QMainWindow):
             return self.error("请先生成网格。")
         self.cancel_preview()
         g, seconds, deep = self.grid.copy(), self.budget.value(), self.deep.isChecked()
+        image = self.image.copy() if self.image is not None else None
+        corners = self.source_view.corners.copy() if self.source_view.corners is not None else None
+        if self.source_view.dimension != len(g.values):
+            image = None
+        inverted = self.inverted
+        locks = np.array([check.isChecked() for check in self.corner_locks])
 
         def done(result):
             self.repairs, diagnostic, elapsed = result
@@ -1028,7 +1173,8 @@ class MainWindow(QMainWindow):
                 self.content.clear()
                 self.payload = None
             self.statusBar().showMessage(f"{elapsed:.1f} 秒 · {len(self.repairs)} 个候选")
-        self.run_job(lambda cancel, progress: repair(g, seconds, deep, cancel, progress), done)
+        self.run_job(lambda cancel, progress: repair_with_geometry(g, image, corners, seconds, deep,
+                     inverted, locks, cancel, progress), done)
 
     def preview_repair(self, index):
         if index < 0 or index >= len(self.repairs):
@@ -1051,6 +1197,11 @@ class MainWindow(QMainWindow):
         if candidate is None:
             return
         self.push_history()
+        if candidate.evidence is not None and candidate.corners is not None:
+            self.grid = candidate.evidence.copy()
+            self.source_view.set_image(self.image, candidate.corners)
+            self.source_view.dimension = len(self.grid.values)
+            self.update_contours()
         changed = self.grid.values != candidate.matrix
         self.grid.values = candidate.matrix.copy()
         self.grid.source[changed] = 3
@@ -1090,6 +1241,7 @@ class MainWindow(QMainWindow):
                  "inverted": self.inverted, "dimension": self.source_view.dimension,
                  "mirror_input": self.mirror_input.isChecked(), "invert_input": self.invert_input.isChecked(),
                  "geometry_mirrored": self.scan_geometry_mirrored,
+                 "corner_locks": [check.isChecked() for check in self.corner_locks],
                  "background_color": self.background_color, "colorful_background": self.colorful_background.isChecked(),
                  "contours": self.contour_check.isChecked(), "contour_interval": self.contour_interval.value(),
                  "contour_opacity": self.contour_alpha.value(), "overlay_style": 3,
@@ -1124,6 +1276,8 @@ class MainWindow(QMainWindow):
         self.mirror_input.setChecked(settings.get("mirror_input",False))
         self.invert_input.setChecked(settings.get("invert_input",False))
         self.scan_geometry_mirrored = settings.get("geometry_mirrored",False)
+        for check, value in zip(self.corner_locks, settings.get("corner_locks", [False]*4)):
+            check.setChecked(bool(value))
         self.set_background_color(settings.get("background_color"))
         self.colorful_background.setChecked(settings.get("colorful_background",True))
         self.bias.setValue(settings.get("bias", 0))

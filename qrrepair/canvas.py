@@ -148,6 +148,7 @@ class CropView(ZoomView):
 class SourceView(ZoomView):
     cornersChanged = Signal(object)
     colorPicked = Signal(object)
+    findersPicked = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -160,7 +161,13 @@ class SourceView(ZoomView):
         self.contour_item = None
         self.base_item = None
         self.picking_color = False
+        self.finder_clicks = None
         self.setAccessibleName("原图透视编辑器")
+
+    def enable_navigation(self, enabled=True):
+        policy = Qt.ScrollBarPolicy.ScrollBarAsNeeded if enabled else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        self.setHorizontalScrollBarPolicy(policy)
+        self.setVerticalScrollBarPolicy(policy)
 
     def set_image(self, image, corners=None):
         self.loading = True
@@ -202,6 +209,17 @@ class SourceView(ZoomView):
             self.fitInView(rect.adjusted(-margin,-margin,margin,margin),Qt.AspectRatioMode.KeepAspectRatio)
 
     def mousePressEvent(self, event):
+        if self.finder_clicks is not None and event.button() == Qt.MouseButton.LeftButton and self.image is not None:
+            p = self.mapToScene(event.position().toPoint())
+            if 0 <= p.x() < self.image.shape[1] and 0 <= p.y() < self.image.shape[0]:
+                self.finder_clicks.append([p.x(), p.y()])
+                self.viewport().update()
+                if len(self.finder_clicks) == 3:
+                    points = np.float32(self.finder_clicks)
+                    self.finder_clicks = None
+                    self.unsetCursor()
+                    self.findersPicked.emit(points)
+            return
         if self.picking_color and event.button() == Qt.MouseButton.LeftButton and self.image is not None:
             p = self.mapToScene(event.position().toPoint())
             x,y = int(np.floor(p.x())),int(np.floor(p.y()))
@@ -231,6 +249,10 @@ class SourceView(ZoomView):
         self.contour_item = item
 
     def drawForeground(self, painter, rect):
+        if self.finder_clicks:
+            painter.setPen(QPen(QColor("#ef8b24"), 2))
+            for x,y in self.finder_clicks:
+                painter.drawEllipse(QPointF(x,y), 5, 5)
         if self.corners is None:
             return
         shade = QPainterPath()

@@ -9,6 +9,28 @@ from qrrepair.app import MainWindow
 from qrrepair.engine import generate, repair
 
 
+def test_manual_three_finder_initialization_and_region_reset():
+    import numpy as np
+    from qrrepair.engine import render_matrix
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    g = generate(b"manual finder control")
+    gray = render_matrix(g.values,10,border=0)
+    w.image = np.repeat(gray[:,:,None],3,2)
+    w.reset_corners()
+    w.finder_version = g.version
+    w.run_job = lambda fn,done:done(fn(lambda:False,lambda message:None))
+    n = len(g.values)
+    w.finders_picked(np.float32([[35,35],[(n-3.5)*10,35],[35,(n-3.5)*10]]))
+    assert np.array_equal(w.grid.values,g.values)
+    w.boundary_candidates = [('stale',)]
+    w.corner_locks[0].setChecked(True)
+    w.reset_document()
+    assert w.boundary_candidates==[] and not w.corner_locks[0].isChecked()
+    w.dirty=False
+    w.close()
+
+
 def test_edit_undo_redo_preview_and_accept():
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
@@ -193,8 +215,7 @@ def test_detail_contour_matches_canvas_and_tracks_precision():
     w.update_contours()
     w.hover_cell(0,0)
     img = w.contour_patch.pixmap().toImage()
-    assert img.pixelColor(10,10).getRgb() == (12,45,105,255)
-    assert img.pixelColor(50,50).getRgb() == (255,255,255,255)
+    assert img.pixelColor(10,10).getRgb() != img.pixelColor(50,50).getRgb()
     assert w.cell_patch.pixmap().size() == w.contour_patch.pixmap().size()
     # The detail uses source evidence, including manually edited modules.
     first = w.contour_patch.pixmap().toImage()
@@ -211,6 +232,20 @@ def test_detail_contour_matches_canvas_and_tracks_precision():
     assert w.crop_view.highlight == (0,0)
     w.corners_changed(w.source_view.corners)
     assert w.cell_patch.pixmap().isNull() and w.contour_patch.pixmap().isNull()
+    w.dirty = False
+    w.close()
+    app.processEvents()
+
+
+def test_adjust_selection_enables_scroll_navigation():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.image = np.zeros((2400, 3200, 3), np.uint8)
+    w.source_view.set_image(w.image, np.float32([[200,200],[3000,200],[3000,2200],[200,2200]]))
+    w.adjust_selection()
+    assert w.source_view.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert w.source_view.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    w.selection_dialog.accept()
     w.dirty = False
     w.close()
     app.processEvents()

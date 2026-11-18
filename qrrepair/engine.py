@@ -39,6 +39,8 @@ class Sample:
     rotation: int = 0
     mirrored: bool = False
     inverted: bool = False
+    corners: np.ndarray | None = None  # refined geometry in original input order
+    geometry: object = None
 
 
 @dataclass
@@ -52,6 +54,8 @@ class Repair:
     changed: int
     strong_changed: int
     blocks: list[str]
+    evidence: Grid | None = None
+    corners: np.ndarray | None = None
 
 
 def read_image(path):
@@ -103,42 +107,50 @@ def detection_image(image, color=None, colorful=False, inverted=False):
 
 
 def locate(image, background=None, colorful=False, inverted=False):
-    """Return boundary corners in TL, TR, BR, BL order and all readable payloads."""
-    image = detection_image(image,background,colorful,inverted)
-    decoded = decode_image(image)
-    if decoded:
-        p = decoded[0].position
-        corners = np.array([(p.top_left.x, p.top_left.y), (p.top_right.x, p.top_right.y),
-                            (p.bottom_right.x, p.bottom_right.y), (p.bottom_left.x, p.bottom_left.y)], np.float32)
-        # Keep geometry in image order: decoder orientation must not silently
-        # apply a mirror before the user's explicit mirror option is sampled.
-        center = corners.mean(0)
-        corners = corners[np.argsort(np.arctan2(corners[:,1]-center[1],corners[:,0]-center[0]))]
-        corners = np.roll(corners,-int(np.argmin(corners.sum(1))),axis=0)
-        return corners, [(x.text, bytes(x.bytes)) for x in decoded]
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    # Resize only the detector input; preserve full-resolution sampling.
-    ratio = min(1.0, 1800 / max(gray.shape))
-    small = cv2.resize(gray, None, fx=ratio, fy=ratio) if ratio < 1 else gray
-    detector = cv2.QRCodeDetector()
-    for src in (small, cv2.GaussianBlur(small, (3, 3), 0), 255 - small):
-        ok, points = detector.detect(src)
-        if ok:
-            return points[0].astype(np.float32) / ratio, []
-    return None, []
+    """Compatibility entry point; UI uses locate_candidates to retain symbols."""
+    candidates = locate_candidates(image, background, colorful, inverted)
+    if not candidates:
+        return None, []
+    return candidates[0].corners.copy(), [(d.text, d.payload) for d in candidates if d.decoded]
 
 
-def optimize_quad(image, corners, background=None, colorful=False, inverted=False):
+def locate_candidates(image, background=None, colorful=False, inverted=False, cancel=lambda: False):
+    from .detection import detect_regions
+    candidates = detect_regions(detection_image(image, background, colorful, inverted), cancel)
+    # Select detector geometry by original structural evidence; never by backend
+    # confidence alone. Keep all distinct symbols for explicit UI selection.
+    for candidate in candidates:
+        if cancel():
+            break
+        proposals = [candidate] + candidate.alternatives
+        best, best_score = candidate.corners, -1.
+        for proposal in proposals[:4]:
+            samples = scan(image, proposal.corners, invert=inverted, cancel=cancel, refine=False)
+            if samples and samples[0].score > best_score:
+                best, best_score = proposal.corners, samples[0].score
+        candidate.corners = best.copy()
+        candidate.score = best_score
+    return sorted([d for d in candidates if d.score >= .68], key=lambda d: (d.decoded, d.score), reverse=True)
+
+
+def optimize_quad(image, corners, background=None, colorful=False, inverted=False, cancel=lambda: False):
     """Detect only inside the rectified user ROI; never fall back to a global scan."""
     p = validate_quad(corners)
     size = int(np.clip(np.max(np.linalg.norm(np.roll(p, -1, axis=0)-p, axis=1)), 256, 1600))
     crop = warp(detection_image(image,background,colorful,inverted), p, size)
     pad = max(24, size // 8)
     padded = cv2.copyMakeBorder(crop, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(255,255,255))
-    found, contents = locate(padded)
-    if found is None:
+    proposals = locate_candidates(padded, cancel=cancel)
+    if not proposals:
         return None, []
-    local = found - pad
+    # Prefer the symbol occupying the user's ROI, not decoder result order.
+    proposals.sort(key=lambda d: abs(cv2.contourArea(d.corners)), reverse=True)
+    valid = [d for d in proposals if np.all(d.corners-pad >= -2) and np.all(d.corners-pad <= size+2)]
+    if not valid:
+        return None, []
+    chosen = valid[0]
+    contents = [(chosen.text, chosen.payload)] if chosen.decoded else []
+    local = chosen.corners - pad
     # Permit only detector rounding at the padded crop boundary.
     if np.any(local < -2) or np.any(local > size+2):
         return None, []
@@ -155,7 +167,7 @@ def optimize_quad(image, corners, background=None, colorful=False, inverted=Fals
         return None, []
 
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=2048)
 def template(version, ec=0, mask=0):
     """Use python-qrcode's tested function patterns and version tables."""
     q = qrcode.QRCode(version=version, error_correction=ec, border=0, mask_pattern=mask)
@@ -226,32 +238,54 @@ def warp(image, corners, size=800):
 
 
 def sample_grid(image, corners, version, bias=0, uncertain=0.18):
+    from .geometry import sample_evidence
+    validate_quad(corners)
     n = version * 4 + 17
-    aligned = warp(image, corners, n * 8)
-    gray = cv2.cvtColor(aligned, cv2.COLOR_RGB2GRAY).astype(np.float32)
-    # Central 4x4 of each module avoids boundary mixing and ringing.
-    cells = gray.reshape(n, 8, n, 8).transpose(0, 2, 1, 3)
-    values = np.median(cells[:, :, 2:6, 2:6], axis=(2, 3))
-    low, high = np.percentile(gray, [12, 88])
-    contrast = max(float(high - low), 24)
-    smooth = cv2.GaussianBlur(values, (0, 0), 3)
-    threshold = .75 * (low + high) / 2 + .25 * smooth + bias
-    p = np.clip(.5 + (threshold - values) / contrast, .015, .985).astype(np.float32)
-    # Low-confidence modules stay binary; their uncertainty is represented by
-    # probability/heatmap rather than by a user-facing unknown state.
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) if image.ndim == 3 else image
+    p, _ = sample_evidence(gray, corners, version, bias)
     matrix = (p >= .5).astype(np.int8)
     return Grid(matrix, p, np.zeros((n, n), bool), np.zeros((n, n), np.uint8))
 
 
 def scan(image, corners, versions=None, bias=0, uncertain=.18, cancel=lambda: False, progress=lambda s: None,
-         mirror=False, invert=False):
+         mirror=False, invert=False, refine=True, locked_corners=None):
+    from .geometry import sample_evidence, refine_geometry
     validate_quad(corners)
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) if image.ndim == 3 else image
     results = []
-    for v in (versions or range(1, 41)):
+    sampled = {}
+    choices = list(versions) if versions is not None else list(range(1, 41))
+    if versions is None:
+        # Cheap structural screening avoids constructing 32 format hypotheses for
+        # forty implausible dimensions. All dimensions still receive image tests.
+        ranks = []
+        for v in choices:
+            if cancel():
+                return []
+            p, _ = sample_evidence(gray, corners, v, bias, dense=False)
+            sampled[v] = p
+            t, f = template(v), finder_mask(v)
+            direction_scores = []
+            for rotation in range(4):
+                pp = np.rot90(np.fliplr(p) if mirror else p, rotation)
+                if invert:
+                    pp = 1-pp
+                loss = np.where(t == 1, 1-pp, pp)
+                # Timing is independent of format hypotheses and discriminates pitch.
+                timing = np.concatenate([loss[6, 8:-8], loss[8:-8, 6]])
+                direction_scores.append(.7*loss[f].mean()+.3*timing.mean())
+            ranks.append((min(direction_scores), v))
+        choices = [v for _, v in sorted(ranks)[:10]]
+    for v in choices:
         if cancel():
             break
         progress(f"采样版本 {v} / 40")
-        g = sample_grid(image, corners, v, bias, uncertain)
+        if v in sampled:
+            p = sampled[v]
+        else:
+            p, _ = sample_evidence(gray, corners, v, bias, dense=False)
+        val = (p >= .5).astype(np.int8)
+        g = Grid(val, p, np.zeros_like(val, bool), np.zeros_like(val, np.uint8))
         fixed = fixed_mask(v)
         finders = finder_mask(v)
         t = template(v)
@@ -278,13 +312,62 @@ def scan(image, corners, versions=None, bias=0, uncertain=.18, cancel=lambda: Fa
                         best = Sample(gg, score, rotation, mirrored, inverted)
         # Score the original evidence first; then make invariant function modules
         # explicit in the very first grid, never part of bit-flip search.
-        best.grid = restore_structure(best.grid)
         results.append(best)
-    return sorted(results, key=lambda x: x.score, reverse=True)
+    results.sort(key=lambda x: x.score, reverse=True)
+    if refine:
+        # Compare candidates using the same dense reliability model. A coarse
+        # unrefined runner-up must not outrank a good fit just because its
+        # confidence has not yet been discounted for spatial instability.
+        for sample in results:
+            if cancel():
+                break
+            oriented = oriented_corners(corners, sample)
+            prob, _ = sample_evidence(gray, oriented, sample.grid.version, bias, dense=True)
+            if invert:
+                prob = 1-prob
+            sample.grid = Grid((prob >= .5).astype(np.int8), prob, np.zeros_like(prob, bool), np.zeros_like(prob, np.uint8))
+            sample.score = structure_score(prob, sample.grid.version)
+        results.sort(key=lambda x: x.score, reverse=True)
+        for sample in results[:min(3, len(results))]:
+            if cancel():
+                break
+            progress(f"精修 V{sample.grid.version} 网格边界")
+            oriented = oriented_corners(corners, sample)
+            locks = None
+            if locked_corners is not None:
+                locks = np.asarray(locked_corners, bool)
+                if sample.mirrored:
+                    locks = locks[[1, 0, 3, 2]]
+                locks = np.roll(locks, -sample.rotation)
+            refined, quality = refine_geometry(gray, oriented, sample.grid.version, invert, cancel, locks)
+            original_order = np.roll(refined, sample.rotation, axis=0)
+            if sample.mirrored:
+                original_order = original_order[[1, 0, 3, 2]]
+            sample.corners, sample.geometry = original_order, quality
+            prob, _ = sample_evidence(gray, refined, sample.grid.version, bias, dense=True)
+            if invert:
+                prob = 1-prob
+            sample.grid = Grid((prob >= .5).astype(np.int8), prob, np.zeros_like(prob, bool), np.zeros_like(prob, np.uint8))
+            sample.score = structure_score(prob, sample.grid.version)
+    for sample in results:
+        sample.grid = restore_structure(sample.grid)
+    results.sort(key=lambda x: x.score, reverse=True)
+    if len(results) > 1 and results[0].geometry is not None:
+        results[0].geometry.ambiguous = results[0].score-results[1].score < .025
+    return results
+
+
+def structure_score(prob, version):
+    t, fixed, finders = template(version), fixed_mask(version), finder_mask(version)
+    losses = np.where(t == 1, 1-prob, prob)
+    fmt = (t >= 0) & ~fixed
+    formats = np.stack([template(version, ec, m)[fmt] for ec in EC_NAMES for m in range(8)])
+    format_loss = np.where(formats == 1, 1-prob[fmt], prob[fmt]).mean(1).min()
+    return float(1-.55*losses[finders].mean()-.30*losses[fixed & ~finders].mean()-.15*format_loss)
 
 
 def oriented_corners(corners, sample):
-    p = np.array(corners, np.float32)
+    p = np.array(sample.corners if sample.corners is not None else corners, np.float32)
     if sample.mirrored:
         p = p[[1, 0, 3, 2]]
     return np.roll(p, -sample.rotation, axis=0)
@@ -473,3 +556,60 @@ def generate(data, ec="M"):
     q.make(fit=True)
     a = np.array(q.modules, np.int8)
     return Grid(a, np.where(a == 1, .99, .01).astype(np.float32), np.zeros_like(a, bool), np.zeros_like(a, np.uint8))
+
+
+def repair_with_geometry(grid, image, corners, seconds=12, deep=False, inverted=False,
+                         locked_corners=None, cancel=lambda: False, progress=lambda s: None):
+    """Retry failed RS using at most two better-supported geometric hypotheses.
+
+    Geometry and evidence travel with the candidate and are only applied on user
+    acceptance. Manual/locked cells retain their values and provenance.
+    """
+    if image is None or corners is None:
+        return repair(grid, seconds, deep, cancel, progress)
+    from .geometry import structural_error, refine_geometry
+    started = time.monotonic()
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    original_error, _ = structural_error(gray, corners, grid.version, inverted)
+    first_geometry, first_quality = refine_geometry(gray, corners, grid.version, inverted, cancel, locked_corners)
+    can_retry = first_quality.refined and first_quality.residual < original_error-.0005
+    remaining = max(0., seconds-(time.monotonic()-started))
+    result, diagnostics, _ = repair(grid, remaining*(.70 if can_retry else 1.), deep, cancel, progress)
+    if result or cancel():
+        return result, diagnostics, time.monotonic()-started
+    if not can_retry:
+        return result, diagnostics, time.monotonic()-started
+    manual = (grid.source == 1) | grid.locked
+    best_error = original_error
+    current = np.asarray(corners, np.float32)
+    for iteration in range(2):
+        remaining = seconds-(time.monotonic()-started)
+        if cancel() or remaining < .1:
+            break
+        progress(f"边界反馈 {iteration+1}/2：核验结构并重新采样")
+        refined, quality = ((first_geometry, first_quality) if iteration == 0 else
+                            refine_geometry(gray, current, grid.version, inverted, cancel, locked_corners))
+        if not quality.refined or quality.residual >= best_error-.0005:
+            break
+        best_error, current = quality.residual, refined
+        sampled = sample_grid(image, refined, grid.version)
+        if inverted:
+            sampled.probability = 1-sampled.probability
+            sampled.values = 1-sampled.values
+        sampled = restore_structure(sampled)
+        sampled.values[manual] = grid.values[manual]
+        sampled.probability[manual] = grid.probability[manual]
+        sampled.source[manual] = grid.source[manual]
+        sampled.locked = grid.locked.copy()
+        remaining = seconds-(time.monotonic()-started)
+        if remaining <= 0:
+            break
+        found, detail, _ = repair(sampled, remaining/(2-iteration), deep, cancel, progress)
+        diagnostics = detail + [f"边界结构误差 {original_error:.3f} → {quality.residual:.3f}"]
+        for candidate in found:
+            candidate.evidence, candidate.corners = sampled.copy(), refined.copy()
+            candidate.blocks.append(f"边界反馈：结构误差 {original_error:.3f} → {quality.residual:.3f}")
+        result.extend(found)
+        if found:
+            break
+    return result, diagnostics, time.monotonic()-started
