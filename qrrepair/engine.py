@@ -489,6 +489,7 @@ def repair(grid: Grid, seconds=12, deep=False, cancel=lambda: False, progress=la
         passed = 0
         for bi, (block, indices) in enumerate(zip(blocks, mapping)):
             if stopped():
+                diagnostics.extend(f"块 {j+1}: 未检查 · 搜索提前结束" for j in range(bi, len(blocks)))
                 break
             nsym = block.total_count - block.data_count
             codec = RSCodec(nsym)
@@ -544,7 +545,10 @@ def repair(grid: Grid, seconds=12, deep=False, cancel=lambda: False, progress=la
                     if answer is not None:
                         break
             if answer is None:
-                diagnostics.append(f"块 {bi+1}: 未通过 · {nsym} 个纠错码字")
+                if stopped():
+                    diagnostics.append(f"块 {bi+1}: 未检查 · 搜索提前结束")
+                else:
+                    diagnostics.append(f"块 {bi+1}: 未通过 · {nsym} 个纠错码字")
             else:
                 changes = int(np.count_nonzero(answer != data))
                 corrected[indices] = answer

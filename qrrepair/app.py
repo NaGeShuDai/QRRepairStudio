@@ -424,6 +424,7 @@ class MainWindow(QMainWindow):
         self.diagnostics.setReadOnly(True)
         self.diagnostics.setPlaceholderText("校验结果")
         self.diagnostics.setMinimumHeight(95)
+        self.diagnostics.hide()
         right.addWidget(self.diagnostics, 1)
         right.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         right_scroll = QScrollArea()
@@ -589,12 +590,41 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("正在停止")
             self.cancel_button.setEnabled(False)
 
+    def set_repair_diagnostics(self, lines, header=None):
+        groups = {"通过": [], "未通过": [], "未检查": []}
+        extras = []
+        for line in lines or []:
+            text = str(line)
+            if text.startswith("块 ") and ": 通过" in text:
+                groups["通过"].append(text)
+            elif text.startswith("块 ") and ": 未通过" in text:
+                groups["未通过"].append(text)
+            elif text.startswith("块 ") and ": 未检查" in text:
+                groups["未检查"].append(text)
+            else:
+                extras.append(text)
+        out = []
+        if header:
+            out.append(header)
+        for name in ("通过", "未通过", "未检查"):
+            if groups[name]:
+                if out: out.append("")
+                out.append(name)
+                out.extend(groups[name])
+        if extras:
+            if out: out.append("")
+            out.extend(extras)
+        self.diagnostics.setPlainText("\n".join(out))
+        self.diagnostics.setVisible(bool(out))
+
     def clear_candidates(self):
         self.repairs = []
         self.selected_repair = None
         self.repair_list.clear()
         self.grid_view.preview = None
         self.apply_button.setEnabled(False)
+        self.diagnostics.clear()
+        self.diagnostics.hide()
 
     def reset_document(self):
         self.boundary_candidates = []
@@ -1175,7 +1205,7 @@ class MainWindow(QMainWindow):
                     f"     改动 {candidate.changed} 格 · 高可靠度 {candidate.strong_changed} 格")
             self.repair_list.blockSignals(False)
             self.tabs.setCurrentIndex(1)
-            self.diagnostics.setPlainText("\n".join(diagnostic))
+            self.set_repair_diagnostics(diagnostic)
             if self.repairs:
                 self.repair_list.setCurrentRow(0)
             else:
@@ -1198,8 +1228,7 @@ class MainWindow(QMainWindow):
         unique = len({r.payload for r in self.repairs})
         state = "存在不同内容的合法候选" if unique > 1 else "候选通过矩阵合法性校验"
         self.result_title.setText(f"{state} · 绿色为修改项")
-        self.diagnostics.setPlainText(f"图像吻合评分 {candidate.score:.3f}（非正确率）\n"
-            f"修改 {candidate.changed} 格，其中高可靠度 {candidate.strong_changed} 格\n\n" + "\n".join(candidate.blocks))
+        self.set_repair_diagnostics(candidate.blocks, f"图像吻合评分 {candidate.score:.3f}（非正确率）\n修改 {candidate.changed} 格，其中高可靠度 {candidate.strong_changed} 格")
         self.apply_button.setEnabled(not self.worker)
 
     def accept_repair(self):
@@ -1219,7 +1248,7 @@ class MainWindow(QMainWindow):
         self.edited()
         self.content.setPlainText(candidate.text)
         self.payload = candidate.payload
-        self.diagnostics.setPlainText("\n".join(candidate.blocks))
+        self.set_repair_diagnostics(candidate.blocks)
         self.result_title.setText("已应用")
 
     def cancel_preview(self):
@@ -1228,6 +1257,8 @@ class MainWindow(QMainWindow):
         self.grid_view.preview = None
         self.grid_view.refresh()
         self.apply_button.setEnabled(False)
+        self.diagnostics.clear()
+        self.diagnostics.hide()
         if had:
             self.payload = None
             self.content.clear()
