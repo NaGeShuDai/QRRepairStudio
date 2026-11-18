@@ -8,13 +8,13 @@ import traceback
 
 import numpy as np
 from PIL import Image
-from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
 from PySide6.QtGui import QAction, QFont, QIcon, QKeySequence, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QListWidget,
     QPlainTextEdit, QSplitter, QFileDialog, QMessageBox, QToolBar, QButtonGroup,
     QDialog, QDialogButtonBox, QFormLayout, QTabWidget, QGroupBox, QProgressBar,
-    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget, QInputDialog)
+    QScrollArea, QLayout, QColorDialog, QGraphicsDropShadowEffect, QStackedWidget, QInputDialog, QStyle)
 
 from . import __version__
 from .engine import (Grid, read_image, locate, scan, repair, render_matrix, generate,
@@ -78,6 +78,8 @@ class MainWindow(QMainWindow):
         self.contour_key = None
         self.contour_layer = None
         self.background_color = None
+        self.binary_mode = False
+        self.inspect_mode = "single"
         self.scan_geometry_mirrored = False
         self.boundary_candidates = []
         self.geometry_status = ""
@@ -239,6 +241,8 @@ class MainWindow(QMainWindow):
         form.addRow("阈值偏移", self.bias)
         self.scan_button = button("生成网格", self.start_scan, True)
         form.addRow(self.scan_button)
+        self.binary_button = button("二值化处理", self.toggle_binary)
+        form.addRow(self.binary_button)
         controls.addWidget(sampling)
         options_scroll = QScrollArea()
         options_scroll.setWidgetResizable(True)
@@ -268,6 +272,10 @@ class MainWindow(QMainWindow):
         self.grid_view.hovered.connect(self.hover_cell)
         self.grid_view.refresh()
         canvas_row = QHBoxLayout()
+        self.region_legend = QLabel("定位码\n时序区域\n格式信息\n版本信息\n校正码字\n数据码字")
+        self.region_legend.setVisible(False)
+        self.region_legend.setToolTip("区域提示颜色说明")
+        canvas_row.addWidget(self.region_legend)
         canvas_row.addWidget(self.grid_view, 1)
         self.heat_legend = QWidget()
         legend_layout = QVBoxLayout(self.heat_legend)
@@ -285,18 +293,19 @@ class MainWindow(QMainWindow):
         self.heat_legend.hide()
         canvas_row.addWidget(self.heat_legend)
         mid.addLayout(canvas_row, 1)
-        self.brush_actions = QWidget()
-        row = QHBoxLayout(self.brush_actions)
-        row.setContentsMargins(0,0,0,0)
-        self.brush_group = QButtonGroup(self)
-        for label, mode in [("黑", "black"), ("白", "white"), ("锁定", "lock"), ("框选", "select")]:
-            b = QPushButton(label)
-            b.setCheckable(True)
-            b.setChecked(mode == "black")
-            b.clicked.connect(lambda checked=False, m=mode: self.set_tool(m))
-            self.brush_group.addButton(b)
-            row.addWidget(b)
-        mid.addWidget(self.brush_actions)
+        self.tool_bar = QToolBar("编辑工具")
+        self.tool_bar.setIconSize(QSize(20,20))
+        self.tool_bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        for text, mode, icon in [("画黑", "black", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)),
+                                 ("画白", "white", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton)),
+                                 ("未知", "unknown", self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)),
+                                 ("框选", "select", self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)),
+                                 ("点选", "inspect", self.style().standardIcon(QStyle.StandardPixmap.SP_DialogHelpButton))]:
+            act = QAction(icon, text, self)
+            act.setToolTip(text)
+            act.triggered.connect(lambda checked=False, m=mode: self.set_tool_mode(m))
+            self.tool_bar.addAction(act)
+        mid.addWidget(self.tool_bar)
         self.selection_actions = QWidget()
         row = QHBoxLayout(self.selection_actions)
         row.setContentsMargins(0,0,0,0)
@@ -319,9 +328,6 @@ class MainWindow(QMainWindow):
         regions.setToolTip("标出定位、时序、格式、版本、校正和数据区域")
         regions.toggled.connect(self.toggle_regions)
         row.addWidget(regions)
-        self.region_legend = QLabel("<span style='color:#4876dc'>■</span>定位  <span style='color:#1eaa91'>■</span>时序  <span style='color:#e8972c'>■</span>格式  <span style='color:#a55bcd'>■</span>版本  <span style='color:#e65782'>■</span>校正  <span style='color:#555'>■</span>数据")
-        self.region_legend.setVisible(False)
-        row.addWidget(self.region_legend)
         row.addWidget(button("适合窗口", self.grid_view.fit))
         controls.addLayout(row)
         row = QHBoxLayout()
@@ -1053,6 +1059,22 @@ class MainWindow(QMainWindow):
         self.heat_legend.setVisible(not value and self.heat_check.isChecked())
         self.grid_view.refresh()
         self.grid_view.fit()
+
+    def toggle_binary(self):
+        self.binary_mode = not self.binary_mode
+        self.binary_button.setText("关闭二值化" if self.binary_mode else "二值化处理")
+        if self.image is not None:
+            self.update_crop()
+            self.start_scan()
+
+    def set_tool_mode(self, mode):
+        if mode == "inspect":
+            self.grid_view.tool = "inspect"
+            self.inspect_mode = "single"
+        elif mode == "unknown":
+            self.grid_view.tool = "unknown"
+        else:
+            self.set_tool(mode)
 
     def set_tool(self, mode):
         self.grid_view.tool = mode
