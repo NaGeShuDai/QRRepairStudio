@@ -924,6 +924,11 @@ class MainWindow(QMainWindow):
             if answer != QMessageBox.StandardButton.Yes:
                 return
         image, corners = self.image.copy(), self.source_view.corners.copy()
+        if self.binary_mode:
+            import cv2
+            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) if image.ndim == 3 else image
+            _, image = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            image = np.repeat(image[..., None], 3, axis=2)
         version, bias = self.version.currentData(), self.bias.value()
         # Mirrored geometry is already rectified after choosing a mirrored sample.
         mirror = self.mirror_input.isChecked() != self.scan_geometry_mirrored

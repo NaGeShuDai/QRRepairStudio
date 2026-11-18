@@ -415,9 +415,9 @@ class GridView(ZoomView):
             if self.grid.values[r, c] >= 0:
                 self.grid.locked[r, c] = not self.grid.locked[r, c]
         elif not self.grid.locked[r, c]:
-            if self.tool not in ("black", "white"):
+            if self.tool not in ("black", "white", "unknown"):
                 return
-            self.grid.values[r, c] = 0 if right else {"black": 1, "white": 0}[self.tool]
+            self.grid.values[r, c] = -1 if self.tool == "unknown" else (0 if right else {"black": 1, "white": 0}[self.tool])
             self.grid.source[r, c] = 1
         self.refresh()
 
