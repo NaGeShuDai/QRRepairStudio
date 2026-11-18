@@ -319,6 +319,9 @@ class MainWindow(QMainWindow):
         regions.setToolTip("标出定位、时序、格式、版本、校正和数据区域")
         regions.toggled.connect(self.toggle_regions)
         row.addWidget(regions)
+        self.region_legend = QLabel("<span style='color:#4876dc'>■</span>定位  <span style='color:#1eaa91'>■</span>时序  <span style='color:#e8972c'>■</span>格式  <span style='color:#a55bcd'>■</span>版本  <span style='color:#e65782'>■</span>校正  <span style='color:#555'>■</span>数据")
+        self.region_legend.setVisible(False)
+        row.addWidget(self.region_legend)
         row.addWidget(button("适合窗口", self.grid_view.fit))
         controls.addLayout(row)
         row = QHBoxLayout()
@@ -625,6 +628,8 @@ class MainWindow(QMainWindow):
         self.apply_button.setEnabled(False)
         self.diagnostics.clear()
         self.diagnostics.hide()
+        self.grid_view.repair_status = None
+        self.grid_view.viewport().update()
 
     def reset_document(self):
         self.boundary_candidates = []
@@ -1062,6 +1067,7 @@ class MainWindow(QMainWindow):
 
     def toggle_regions(self, value):
         self.grid_view.show_regions = value
+        self.region_legend.setVisible(value)
         self.grid_view.viewport().update()
 
     def ensure_editable(self):
@@ -1221,6 +1227,7 @@ class MainWindow(QMainWindow):
             return
         candidate = self.repairs[index]
         self.selected_repair = candidate
+        self.grid_view.repair_status = "通过" if candidate.blocks and all(": 通过" in x for x in candidate.blocks if x.startswith("块 ")) else "未通过"
         self.grid_view.preview = candidate.matrix
         self.grid_view.refresh()
         self.content.setPlainText(candidate.text)

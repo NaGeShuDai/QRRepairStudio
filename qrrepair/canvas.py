@@ -311,6 +311,7 @@ class GridView(ZoomView):
         self.qr_opacity = .3
         self.preview_mode = False
         self.show_regions = False
+        self.repair_status = None
         self.base_item = None
         self.setAccessibleName("二维码模块编辑器")
 
@@ -363,6 +364,15 @@ class GridView(ZoomView):
         if self.grid is None or self.preview_mode:
             return
         n, cell = len(self.grid.values), self.CELL
+        if self.repair_status:
+            masks = region_masks(self.grid.version)
+            data_mask = masks.get("数据")
+            if data_mask is not None:
+                state = self.repair_status
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(52, 190, 110, 78) if state == "通过" else QColor(235, 70, 70, 78) if state == "未通过" else QColor(150, 150, 150, 45))
+                for r, c in np.argwhere(data_mask):
+                    painter.drawRect(QRectF(c*cell, r*cell, cell, cell))
         if self.show_regions:
             colors = {"定位": QColor(72, 118, 220, 75), "时序": QColor(30, 170, 145, 85),
                       "格式": QColor(232, 151, 44, 90), "版本": QColor(165, 91, 205, 90),

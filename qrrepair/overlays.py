@@ -12,9 +12,9 @@ def confidence_colors(strength):
 
 
 def contour_color(level):
-    """Map grayscale 0→255 to white→deep navy."""
+    """Map grayscale black→deep navy and white→white."""
     t = np.clip(np.asarray(level), 0, 255)[..., None]/255
-    return np.rint(np.array([255,255,255])*(1-t) + np.array([12,45,105])*t).astype(np.uint8)
+    return np.rint(np.array([12,45,105])*(1-t) + np.array([255,255,255])*t).astype(np.uint8)
 
 
 def grayscale_contours(crop, interval=16):
