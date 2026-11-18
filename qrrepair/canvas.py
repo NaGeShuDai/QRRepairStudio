@@ -5,7 +5,7 @@ import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap, QPolygonF, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsEllipseItem, QGraphicsItem
-from .engine import finder_mask, warp, render_matrix
+from .engine import finder_mask, warp, render_matrix, region_masks
 from .overlays import grid_colors
 
 
@@ -310,6 +310,7 @@ class GridView(ZoomView):
         self.contour_opacity = .65
         self.qr_opacity = .3
         self.preview_mode = False
+        self.show_regions = False
         self.base_item = None
         self.setAccessibleName("二维码模块编辑器")
 
@@ -362,6 +363,16 @@ class GridView(ZoomView):
         if self.grid is None or self.preview_mode:
             return
         n, cell = len(self.grid.values), self.CELL
+        if self.show_regions:
+            colors = {"定位": QColor(72, 118, 220, 75), "时序": QColor(30, 170, 145, 85),
+                      "格式": QColor(232, 151, 44, 90), "版本": QColor(165, 91, 205, 90),
+                      "校正": QColor(230, 87, 130, 75), "数据": QColor(80, 80, 80, 25)}
+            masks = region_masks(self.grid.version)
+            for name, mask in masks.items():
+                painter.setBrush(colors[name])
+                painter.setPen(Qt.PenStyle.NoPen)
+                for r, c in np.argwhere(mask):
+                    painter.drawRect(QRectF(c*cell, r*cell, cell, cell))
         if self.show_lines and self.transform().m11()*cell > 6:
             painter.setPen(QPen(QColor(90, 115, 139, 75), 0))
             for i in range(n+1):

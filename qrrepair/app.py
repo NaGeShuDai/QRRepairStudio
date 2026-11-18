@@ -279,6 +279,7 @@ class MainWindow(QMainWindow):
         self.legend_strip.setPixmap(pixmap(strip))
         legend_layout.addWidget(self.legend_strip)
         legend_layout.addWidget(QLabel("0% 低"))
+        legend_layout.addWidget(QLabel("区域：定位·时序·格式·版本·校正·数据"))
         legend_layout.addStretch()
         self.heat_legend.setToolTip("置信度 = |2p−1|，p 是图像黑色倾向；并非恢复内容的正确率。")
         self.heat_legend.hide()
@@ -313,6 +314,11 @@ class MainWindow(QMainWindow):
         lines.setChecked(True)
         lines.toggled.connect(lambda v: self.toggle_lines(v))
         row.addWidget(lines)
+        regions = QCheckBox("区域提示")
+        self.region_check = regions
+        regions.setToolTip("标出定位、时序、格式、版本、校正和数据区域")
+        regions.toggled.connect(self.toggle_regions)
+        row.addWidget(regions)
         row.addWidget(button("适合窗口", self.grid_view.fit))
         controls.addLayout(row)
         row = QHBoxLayout()
@@ -1024,6 +1030,10 @@ class MainWindow(QMainWindow):
         self.grid_view.show_lines = value
         self.grid_view.viewport().update()
 
+    def toggle_regions(self, value):
+        self.grid_view.show_regions = value
+        self.grid_view.viewport().update()
+
     def ensure_editable(self):
         if self.grid is None:
             self.error("请先生成或载入网格。")
@@ -1245,7 +1255,7 @@ class MainWindow(QMainWindow):
                  "background_color": self.background_color, "colorful_background": self.colorful_background.isChecked(),
                  "contours": self.contour_check.isChecked(), "contour_interval": self.contour_interval.value(),
                  "contour_opacity": self.contour_alpha.value(), "overlay_style": 3,
-                 "heatmap": self.heat_check.isChecked()})
+                 "heatmap": self.heat_check.isChecked(), "regions": self.region_check.isChecked()})
         except Exception as e:
             self.error(e)
             return False
@@ -1285,6 +1295,7 @@ class MainWindow(QMainWindow):
         self.contour_alpha.setValue(settings.get("contour_opacity",65) if settings.get("overlay_style") == 3 else 65)
         self.contour_check.setChecked(settings.get("contours",False))
         self.heat_check.setChecked(settings.get("heatmap",False))
+        self.region_check.setChecked(settings.get("regions",False))
         self.grid_view.set_grid(grid, True)
         self.update_contours()
         self.project_path = path

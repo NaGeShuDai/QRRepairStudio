@@ -286,3 +286,21 @@ def test_preview_shows_exact_matrix_with_quiet_zone_and_blocks_paint():
     w.dirty = False
     w.close()
     app.processEvents()
+
+
+def test_region_overlay_toggle_marks_qr_function_areas():
+    app = QApplication.instance() or QApplication([])
+    w = MainWindow()
+    w.grid = generate(b"regions")
+    w.grid_view.set_grid(w.grid, True)
+    assert not w.grid_view.show_regions
+    w.region_check.setChecked(True)
+    assert w.grid_view.show_regions
+    before = len(w.grid_view.scene().items())
+    w.grid_view.viewport().update()
+    assert before >= 1
+    w.region_check.setChecked(False)
+    assert not w.grid_view.show_regions
+    w.dirty = False
+    w.close()
+    app.processEvents()
